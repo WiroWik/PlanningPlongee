@@ -1,0 +1,9 @@
+{
+    "java.project.sourcePaths": ["src"],
+    "java.project.outputPath": "bin",
+    "java.project.referencedLibraries": [
+        "lib/**/*.jar",
+        "c:\\Users\\leonl\\Documents\\BUT_INFO2\\SQLdansLangage\\TP1\\mysql-connector-java-8.0.30.jar",
+        "c:\\Users\\leonl\\Documents\\BUT_INFO2\\SQLdansLangage\\TP1\\protobuf-java-3.19.4.jar"
+    ]
+}
