@@ -11,10 +11,15 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Properties;
 
 import javax.swing.AbstractCellEditor;
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JFormattedTextField.AbstractFormatter;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
@@ -29,6 +34,10 @@ import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumnModel;
 
+import org.jdatepicker.impl.JDatePanelImpl;
+import org.jdatepicker.impl.JDatePickerImpl;
+import org.jdatepicker.impl.UtilDateModel;
+
 
 public class PlanningGUI implements ActionListener{
 
@@ -39,7 +48,10 @@ public class PlanningGUI implements ActionListener{
     JFrame frame;
     JPanel saveCard, editCard, cards, savePanel, editPanel;
     JLabel nomCompetLabel,dateCompetLabel,imageCompetLabel,paysCompetLabel,villeCompetLabel,adresseCompetLabel;
-    JTextField nomCompetTextField,dateCompetTextField,imageCompetTextField,paysCompetTextField,villeCompetTextField,adresseCompetTextField,feedbackField;
+    JTextField nomCompetTextField,imageCompetTextField,paysCompetTextField,villeCompetTextField,adresseCompetTextField,feedbackField;
+    UtilDateModel model = new UtilDateModel();
+    JDatePanelImpl datePanel;
+    JDatePickerImpl datePicker;
     JButton saveButton, button;
     JMenu gestionBBDMenu;
     JMenuItem saveMenuItem, editMenuItem;
@@ -57,7 +69,7 @@ public class PlanningGUI implements ActionListener{
         
         
         /*saveCard */
-        JLabel titreLabel = new JLabel("Enregistrer un nouveau vol :", JLabel.CENTER);
+        JLabel titreLabel = new JLabel("Enregistrer une compétition :", JLabel.CENTER);
         JPanel formPanel = new JPanel(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
         JMenuBar menuBar = new JMenuBar();
@@ -71,14 +83,37 @@ public class PlanningGUI implements ActionListener{
         JLabel[] formLabels = {nomCompetLabel,dateCompetLabel,imageCompetLabel,paysCompetLabel,villeCompetLabel,adresseCompetLabel};
 
         nomCompetTextField = new JTextField();
-        dateCompetTextField = new JTextField();
+        Properties dateProperties = new Properties();
+        dateProperties.put("text.today", "Aujourd'hui");
+        dateProperties.put("text.month", "Mois");
+        dateProperties.put("text.year", "Année");
+        datePanel = new JDatePanelImpl(model, dateProperties);
+        datePicker = new JDatePickerImpl(datePanel, new AbstractFormatter() {
+            private String datePattern = "yyyy-MM-dd";
+            private SimpleDateFormat dateFormatter = new SimpleDateFormat(datePattern);
+
+            @Override
+            public Object stringToValue(String text) throws ParseException{
+                return dateFormatter.parseObject(text);
+            }
+
+            @Override
+            public String valueToString(Object value) {
+            if (value != null) {
+                Calendar cal = (Calendar) value;
+                return dateFormatter.format(cal.getTime());
+            }
+
+            return "";
+            }
+        });
         imageCompetTextField = new JTextField();
         paysCompetTextField = new JTextField();
         villeCompetTextField = new JTextField();
         adresseCompetTextField = new JTextField();
         feedbackField = new JTextField();
         feedbackField.setEditable(false);
-        JTextField[] formTextFields = {nomCompetTextField,dateCompetTextField,imageCompetTextField,paysCompetTextField,villeCompetTextField,adresseCompetTextField,feedbackField};
+        JTextField[] formTextFields = {nomCompetTextField,imageCompetTextField,paysCompetTextField,villeCompetTextField,adresseCompetTextField,feedbackField};
 
         saveButton = new JButton("Enregistrer la compétition");
         saveButton.addActionListener(this);
@@ -101,6 +136,7 @@ public class PlanningGUI implements ActionListener{
         c.fill = GridBagConstraints.HORIZONTAL;
         c.insets = new Insets(10,10,0,0);
         for (JLabel currentLabel : formLabels) {
+            
             c.gridy = y;
             formPanel.add(currentLabel,c);
             y++;
@@ -113,16 +149,25 @@ public class PlanningGUI implements ActionListener{
         y = 0;
         c.gridx = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
+        int i = 0;
         for (JTextField currentTextField : formTextFields) {
             c.gridy = y;
             currentTextField.setColumns(10);
             formPanel.add(currentTextField,c);
             y++;
+
+            if (i == 0) {
+                c.gridy = y;
+                y++;
+                formPanel.add(datePicker,c);
+            }
+            i++;
+            System.out.println(y);
         }
 
         /*editCard */
-        JPanel volTablePanel = generateVolTable();
-        editCard.add(volTablePanel);
+        JPanel planningTablePanel = generatePlanningTable();
+        editCard.add(planningTablePanel);
 
         
 
@@ -154,11 +199,14 @@ public class PlanningGUI implements ActionListener{
             errorDialog.setSize(500, 100);
             errorDialog.add(errorMessageLabel);
 
+
+
             /*Connexion SQL */
             String url = "jdbc:mysql://localhost:" + PORT + "/sddv_plongee";
             Connection con;
             Statement stmt;
-            String query = "INSERT INTO `competitions` (`NumVol`, `Heure_depart`, `Heure_arrive`, `Ville_depart`, `Ville_arrivee`) VALUES ('" + numVolTextField.getText() + "', '" + heureDepTextField.getText() + "', '" + heureArivTextField.getText() + "', '" + aeroDepTextField.getText() + "', '" + aeroArivTextField.getText() + "');";
+            String dateSQL = datePicker.getModel().getYear() + "-" + (datePicker.getModel().getMonth() + 1) + "-" + datePicker.getModel().getDay();
+            String query = "INSERT INTO `competitions` (`id_compet`, `nom_compet`, `date_compet`, `image_compet`, `pays`, `ville`, `adresse`) VALUES (NULL,'" + nomCompetTextField.getText() + "', '" + dateSQL + "', '" + imageCompetTextField.getText() + "', '" + paysCompetTextField.getText() + "', '" + villeCompetTextField.getText() + "', '" + adresseCompetTextField.getText() + "');";
 
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
@@ -175,15 +223,15 @@ public class PlanningGUI implements ActionListener{
                 stmt.close();
                 con.close();
                 System.out.println("La bd a bien été mise à jour");
-                feedbackField.setText("Le vol " + numVolTextField.getText() + " a bien été enregistré" );
+                feedbackField.setText("La compétition " + nomCompetTextField.getText() + " a bien été enregistré" );
             } catch(SQLException ex) {
                 System.err.println("SQLException " + ex.getMessage());
                 errorMessageLabel.setText("SQLException " + ex.getMessage());
                 errorDialog.setVisible(true);
             }
             editCard.removeAll();
-            JPanel volTablePanel = generateVolTable();
-            editCard.add(volTablePanel);
+            JPanel planningTablePanel = generatePlanningTable();
+            editCard.add(planningTablePanel);
         }
 
         if (e.getSource() == saveMenuItem) {
@@ -198,18 +246,18 @@ public class PlanningGUI implements ActionListener{
         }
     }
 
-    public JPanel generateVolTable() {
-        JPanel volTablePanel = new JPanel(new BorderLayout());
-        JTable volTable, headerTable;
-        String[] columnName = {"NumVol", "Heure_depart", "Heure_arrive", "Ville_depart", "Ville_arrivee", "Modifier", "Supprimer"};
+    public JPanel generatePlanningTable() {
+        JPanel competTablePanel = new JPanel(new BorderLayout());
+        JTable competTable, headerTable;
+        String[] columnName = {"id_compet", "nom_compet", "date_compet", "image_compet", "pays", "ville", "adresse", "modifier", "supprimer"};
         
 
         /*Connexion SQL */
-        String url = "jdbc:mysql://localhost:" + PORT + "/vols";
+        String url = "jdbc:mysql://localhost:" + PORT + "/sddv_plongee";
         Connection con;
         Statement stmt, stmt2;
-        String query = "SELECT * FROM vol";
-        String query2 = "SELECT COUNT(*) AS rowCount FROM vol";
+        String query = "SELECT * FROM competitions";
+        String query2 = "SELECT COUNT(*) AS rowCount FROM competitions";
         
 
         try {
@@ -229,37 +277,43 @@ public class PlanningGUI implements ActionListener{
             ResultSet rs2 = stmt2.executeQuery(query2);
 
 
-            System.out.println("Les vols");
+            System.out.println("Compétitions");
             int i = 0;
             
             rs2.next();
             System.out.println(rs2.getInt("rowCount"));
             int tableSize = rs2.getInt("rowCount");
-            Object[][] data = new String[tableSize][7];
+            Object[][] data = new String[tableSize][9];
             
             
 
             while (rs.next()) {
-                Object[] rowValue = new String[7];
+                Object[] rowValue = new String[9];
                 
-                String numVol = rs.getString("Numvol");
-                rowValue[0] = numVol;
+                String idCompet = rs.getString("id_compet");
+                rowValue[0] = idCompet;
 
-                String heureDepart = rs.getString("Heure_depart");
-                rowValue[1] = heureDepart;
+                String nomCompet = rs.getString("nom_compet");
+                rowValue[1] = nomCompet;
 
-                String heureArrive = rs.getString("Heure_arrive");
-                rowValue[2] = heureArrive;
+                String dateCompet = rs.getString("date_compet");
+                rowValue[2] = dateCompet;
 
-                String villeDepart = rs.getString("Ville_depart");
-                rowValue[3] = villeDepart;
+                String imageCompet = rs.getString("image_compet");
+                rowValue[3] = imageCompet;
 
-                String villeArrivee = rs.getString("Ville_arrivee");
-                rowValue[4] = villeArrivee;
+                String paysCompet = rs.getString("pays");
+                rowValue[4] = paysCompet;
+
+                String villeCompet = rs.getString("ville");
+                rowValue[5] = villeCompet;
+
+                String adresseCompet = rs.getString("adresse");
+                rowValue[6] = adresseCompet;
                 
-                rowValue[5] = "Modifier";
+                rowValue[7] = "Modifier";
 
-                rowValue[6] = "Supprimer";
+                rowValue[8] = "Supprimer";
 
                 data[i] = rowValue;
                 i++;
@@ -268,20 +322,20 @@ public class PlanningGUI implements ActionListener{
             DefaultTableModel model = new DefaultTableModel(data, columnName) {
                 @Override
                 public boolean isCellEditable(int row, int col) {
-                    return col == 5 || col == 6;
+                    return col == 7 || col == 8;
                 }
             };
-            volTable = new JTable(model);
+            competTable = new JTable(model);
             headerTable = new JTable(headercolumnName, columnName);
 
-            ButtonColumn buttonColumn = new ButtonColumn(volTable, 5);
-            ButtonColumn buttonColumn2 = new ButtonColumn(volTable, 6);
+            ButtonColumn buttonColumn = new ButtonColumn(competTable, 7);
+            ButtonColumn buttonColumn2 = new ButtonColumn(competTable, 8);
 
             headerTable.setEnabled(false);
-            volTable.setCellSelectionEnabled(false);
+            competTable.setCellSelectionEnabled(false);
 
-            volTablePanel.add(headerTable, BorderLayout.NORTH);
-            volTablePanel.add(volTable, BorderLayout.CENTER);
+            competTablePanel.add(headerTable, BorderLayout.NORTH);
+            competTablePanel.add(competTable, BorderLayout.CENTER);
 
             stmt.close();
             stmt2.close();
@@ -290,7 +344,7 @@ public class PlanningGUI implements ActionListener{
             System.err.println("SQLException " + ex.getMessage());
         }
         
-        return volTablePanel;
+        return competTablePanel;
     }
 
     class ButtonColumn extends AbstractCellEditor implements TableCellRenderer, TableCellEditor, ActionListener{
@@ -298,10 +352,13 @@ public class PlanningGUI implements ActionListener{
         JButton renderButton;
         JButton editButton;
         String text;
-        JLabel numVolLabelEdit,heureDepLabelEdit,heureArivLabelEdit,aeroDepLabelEdit,aeroArivLabelEdit;
-        JTextField numVolTextFieldEdit,heureDepTextFieldEdit,heureArivTextFieldEdit,aeroDepTextFieldEdit,aeroArivTextFieldEdit,feedbackFieldEdit;
+        JLabel nomCompetLabelEdit,dateCompetLabelEdit,imageCompetLabelEdit,paysCompetLabelEdit,aeroArivLabelEdit,villeCompetLabelEdit,adresseCompetLabelEdit;
+        JTextField nomCompetTextFieldEdit,imageCompetTextFieldEdit,paysCompetTextFieldEdit,villeCompetTextFieldEdit,adresseCompetTextFieldEdit,feedbackFieldEdit;
         JButton modifButton;
         JDialog editDialog;
+        UtilDateModel model = new UtilDateModel();
+        JDatePanelImpl datePanelEdit;
+        JDatePickerImpl datePickerEdit;
 
         public ButtonColumn(JTable table, int column)
         {
@@ -318,44 +375,72 @@ public class PlanningGUI implements ActionListener{
             columnModel.getColumn(column).setCellEditor( this );
 
             
-            JLabel titreLabelEdit = new JLabel("Enregistrer un nouveau vol :", JLabel.CENTER);
+            JLabel titreLabelEdit = new JLabel("Enregistrer une compétition :", JLabel.CENTER);
 
             
             JPanel formPanelEdit = new JPanel(new GridBagLayout());
             GridBagConstraints c = new GridBagConstraints();
 
-            numVolLabelEdit = new JLabel("Entrer numéro de vol");
-            heureDepLabelEdit = new JLabel("Entrer Heure de départ HH:MM");
-            heureArivLabelEdit = new JLabel("Entrer Heure d'arrivée HH:MM");
-            aeroDepLabelEdit = new JLabel("Entrer Aéroport de depart");
-            aeroArivLabelEdit = new JLabel("Entrer Aéroport d'arrivée");
+            nomCompetLabelEdit = new JLabel("Nom de la compétition");
+            dateCompetLabelEdit = new JLabel("Date");
+            imageCompetLabelEdit = new JLabel("Image de la compétition (URL)");
+            paysCompetLabelEdit = new JLabel("Pays");
+            villeCompetLabelEdit = new JLabel("Ville");
+            adresseCompetLabelEdit = new JLabel("Adresse");
 
-            JLabel[] formLabelsEdit = {numVolLabelEdit,heureDepLabelEdit,heureArivLabelEdit,aeroDepLabelEdit,aeroArivLabelEdit};
+            JLabel[] formLabelsEdit = {nomCompetLabelEdit,dateCompetLabelEdit,imageCompetLabelEdit,paysCompetLabelEdit,villeCompetLabelEdit,adresseCompetLabelEdit};
 
-            if (numVolTextFieldEdit == null)
-                numVolTextFieldEdit = new JTextField();
+            if (nomCompetTextFieldEdit == null)
+                nomCompetTextFieldEdit = new JTextField();
             
-            if (heureDepTextFieldEdit == null)
-                heureDepTextFieldEdit = new JTextField();
+            if (datePickerEdit == null) {
+                Properties datePropertiesEdit = new Properties();
+                datePropertiesEdit.put("text.today", "Aujourd'hui");
+                datePropertiesEdit.put("text.month", "Mois");
+                datePropertiesEdit.put("text.year", "Année");
+                datePanelEdit = new JDatePanelImpl(model, datePropertiesEdit);
+                datePickerEdit = new JDatePickerImpl(datePanel, new AbstractFormatter() {
+                private String datePattern = "yyyy-MM-dd";
+                private SimpleDateFormat dateFormatter = new SimpleDateFormat(datePattern);
+    
+                @Override
+                public Object stringToValue(String text) throws ParseException{
+                    return dateFormatter.parseObject(text);
+                }
+    
+                @Override
+                public String valueToString(Object value) {
+                if (value != null) {
+                    Calendar cal = (Calendar) value;
+                    return dateFormatter.format(cal.getTime());
+                }
+    
+                return "";
+                }
+                });
+                
+            }
 
-            if (heureArivTextFieldEdit == null)
-                heureArivTextFieldEdit = new JTextField();
+            if (imageCompetTextFieldEdit == null)
+                imageCompetTextFieldEdit = new JTextField();
 
-            if (aeroDepTextFieldEdit == null)
-                aeroDepTextFieldEdit = new JTextField();
+            if (paysCompetTextFieldEdit == null)
+                paysCompetTextFieldEdit = new JTextField();
 
-            if (aeroArivTextFieldEdit == null)
-                aeroArivTextFieldEdit = new JTextField();
+            if (villeCompetTextFieldEdit == null)
+                villeCompetTextFieldEdit = new JTextField();
 
-            numVolTextFieldEdit.setEditable(false);
+            if (adresseCompetTextFieldEdit == null)
+                adresseCompetTextFieldEdit = new JTextField();
+
 
             
 
             feedbackFieldEdit = new JTextField();
             feedbackFieldEdit.setEditable(false);
-            JTextField[] formTextFieldsEdit = {numVolTextFieldEdit,heureDepTextFieldEdit,heureArivTextFieldEdit,aeroDepTextFieldEdit,aeroArivTextFieldEdit,feedbackFieldEdit};
+            JTextField[] formTextFieldsEdit = {nomCompetTextFieldEdit,imageCompetTextFieldEdit,paysCompetTextFieldEdit,villeCompetTextFieldEdit,adresseCompetTextFieldEdit};
 
-            modifButton = new JButton("Modifier le vol");
+            modifButton = new JButton("Modifier la compétition");
             modifButton.addActionListener(this);
 
             /*Colonne 0*/
@@ -377,15 +462,24 @@ public class PlanningGUI implements ActionListener{
             y = 0;
             c.gridx = 1;
             c.fill = GridBagConstraints.HORIZONTAL;
+            int i = 0;
             for (JTextField currentTextField : formTextFieldsEdit) {
+            c.gridy = y;
+            currentTextField.setColumns(10);
+            formPanelEdit.add(currentTextField,c);
+            y++;
+
+            if (i == 0) {
                 c.gridy = y;
-                currentTextField.setColumns(10);
-                formPanelEdit.add(currentTextField,c);
                 y++;
+                formPanelEdit.add(datePickerEdit,c);
             }
+            i++;
+            System.out.println(y);
+        }
 
             editDialog = new JDialog(frame, "Edit Dialog");
-            System.out.println(numVolTextFieldEdit.getText());
+            System.out.println(nomCompetTextFieldEdit.getText());
 
             editDialog.add(titreLabelEdit);
             editDialog.add(formPanelEdit);
@@ -429,20 +523,22 @@ public class PlanningGUI implements ActionListener{
         }
 
         public void actionPerformed(ActionEvent e){
-            String numVolCurrent, heureDepCurrent, heureArivCurrent, aeroDepCurrent, aeroArivCurrent;
-            numVolCurrent = "";
-            heureDepCurrent = "";
-            heureArivCurrent = "";
-            aeroDepCurrent = "";
-            aeroArivCurrent = "";
+            String nomCompetCurrent, dateCompetCurrent, imageCompetCurrent, paysCompetCurrent, villeCompetCurrent, adresseCompetCurrent = "";
+            
 
             if (e.getActionCommand() == "Modifier") {
+                nomCompetCurrent = null;
+                dateCompetCurrent = null; 
+                imageCompetCurrent = null;
+                paysCompetCurrent = null;
+                villeCompetCurrent = null;
+                adresseCompetCurrent = null;
                 editDialog.setVisible(true);
             }
 
             
             
-            if (e.getActionCommand() == "Modifier le vol") {
+            if (e.getActionCommand() == "Modifier la compétition") {
                 System.out.println(table.getValueAt(table.getSelectedRow(), 0));
 
                 JDialog errorDialog = new JDialog(frame, "Error Dialog");
@@ -451,40 +547,46 @@ public class PlanningGUI implements ActionListener{
                 errorDialog.setSize(500, 100);
                 errorDialog.add(errorMessageLabel);
 
-                numVolCurrent = (String) table.getValueAt(table.getSelectedRow(), 0);
-                /*
-                heureDepCurrent = (String) table.getValueAt(table.getSelectedRow(), 1);
-                heureArivCurrent = (String) table.getValueAt(table.getSelectedRow(), 2);
-                aeroDepCurrent = (String) table.getValueAt(table.getSelectedRow(), 3);
-                aeroArivCurrent = (String) table.getValueAt(table.getSelectedRow(), 4);
-                */
-
-                if (heureDepTextFieldEdit.getText().equals((String) table.getValueAt(table.getSelectedRow(), 1) + ":00") || !heureDepTextFieldEdit.getText().equals(null))
-                    heureDepCurrent = (String) table.getValueAt(table.getSelectedRow(), 1);
-                else
-                    heureDepCurrent = heureDepTextFieldEdit.getText();
                 
-                if (heureArivTextFieldEdit.getText().equals((String) table.getValueAt(table.getSelectedRow(), 2) + ":00") || !heureArivTextFieldEdit.getText().equals(null))
-                    heureArivCurrent = (String) table.getValueAt(table.getSelectedRow(), 2);
+                String dateSQLEdit = datePickerEdit.getModel().getYear() + "-" + (datePickerEdit.getModel().getMonth() + 1) + "-" + datePickerEdit.getModel().getDay();
+                
+                if (nomCompetTextFieldEdit.getText().equals(""))
+                    nomCompetCurrent = (String) table.getValueAt(table.getSelectedRow(), 1);
                 else
-                    heureArivCurrent = heureArivTextFieldEdit.getText();
+                    nomCompetCurrent = nomCompetTextFieldEdit.getText();
+                    
+                if (dateSQLEdit.equals(null))
+                    dateCompetCurrent = (String) table.getValueAt(table.getSelectedRow(), 2);
+                else
+                    dateCompetCurrent = dateSQLEdit;
+                
+                if (imageCompetTextFieldEdit.getText().equals(""))
+                    imageCompetCurrent = (String) table.getValueAt(table.getSelectedRow(), 3);
+                else
+                    imageCompetCurrent = imageCompetTextFieldEdit.getText();
 
-                if (aeroDepTextFieldEdit.getText().equals((String) table.getValueAt(table.getSelectedRow(), 3)) || aeroDepTextFieldEdit.getText().equals(""))
-                    aeroDepCurrent = (String) table.getValueAt(table.getSelectedRow(), 3);
+                if (paysCompetTextFieldEdit.getText().equals(""))
+                    paysCompetCurrent = (String) table.getValueAt(table.getSelectedRow(), 4);
                 else
-                    aeroDepCurrent = aeroDepTextFieldEdit.getText();
+                    paysCompetCurrent = paysCompetTextFieldEdit.getText();
 
-                if (aeroArivTextFieldEdit.getText().equals((String) table.getValueAt(table.getSelectedRow(), 4)) || aeroArivTextFieldEdit.getText().equals(""))
-                    aeroArivCurrent = (String) table.getValueAt(table.getSelectedRow(), 4);
+                if (villeCompetTextFieldEdit.getText().equals(""))
+                    villeCompetCurrent = (String) table.getValueAt(table.getSelectedRow(), 5);
                 else
-                    aeroArivCurrent = aeroArivTextFieldEdit.getText();
+                    villeCompetCurrent = villeCompetTextFieldEdit.getText();
+
+                if (adresseCompetTextFieldEdit.getText().equals(""))
+                    adresseCompetCurrent = (String) table.getValueAt(table.getSelectedRow(), 6);
+                else
+                    adresseCompetCurrent = adresseCompetTextFieldEdit.getText();
                     
 
                 /*Connexion SQL */
-                String url = "jdbc:mysql://localhost:" + PORT + "/vols";
+                String url = "jdbc:mysql://localhost:" + PORT + "/sddv_plongee";
                 Connection con;
                 Statement stmt;
-                String query = "UPDATE vol SET Numvol = '" + numVolCurrent + "', Heure_depart = '" + heureDepCurrent + "', Heure_arrive = '" + heureArivCurrent + "', Ville_depart = '" + aeroDepCurrent + "', Ville_arrivee = '" + aeroArivCurrent + "' WHERE vol.Numvol = '" + (String) table.getValueAt(table.getSelectedRow(), 0) + "';";
+                String query = "UPDATE `competitions` SET nom_compet = '" + nomCompetCurrent + "', date_compet = '" + dateCompetCurrent + "', image_compet = '" + imageCompetCurrent + "', pays = '" + paysCompetCurrent + "', ville = '" + villeCompetCurrent + "', adresse = '" + adresseCompetCurrent + "' WHERE id_compet = " + (String) table.getValueAt(table.getSelectedRow(), 0) + ";";
+
                 
                 
                 try {
@@ -502,12 +604,13 @@ public class PlanningGUI implements ActionListener{
                     stmt.close();
                     con.close();
                     System.out.println("La bd a bien été mise à jour");
-                    feedbackFieldEdit.setText("Le vol " + numVolTextField.getText() + " a bien été enregistré" );
+                    feedbackFieldEdit.setText("La competition a bien été enregistré" );
                     System.out.println(query);
                     editCard.removeAll();
-                    JPanel volTablePanel = generateVolTable();
-                    editCard.add(volTablePanel);
+                    JPanel competTablePanel = generatePlanningTable();
+                    editCard.add(competTablePanel);
                     editCard.revalidate();
+                    editDialog.dispose();
                 } catch(SQLException ex) {
                     System.err.println("SQLException " + ex.getMessage());
                     errorMessageLabel.setText("SQLException " + ex.getMessage());
@@ -520,10 +623,10 @@ public class PlanningGUI implements ActionListener{
 
             if (e.getActionCommand() == "Supprimer") {
                     /*Connexion SQL */
-                    String urlDel = "jdbc:mysql://localhost:" + PORT + "/vols";
+                    String urlDel = "jdbc:mysql://localhost:" + PORT + "/sddv_plongee";
                     Connection conDel;
                     Statement stmtDel;
-                    String queryDel = "DELETE FROM vol WHERE vol.Numvol = '" + (String) table.getValueAt(table.getSelectedRow(), 0) + "'";
+                    String queryDel = "DELETE FROM competitions WHERE competitions.id_compet = '" + (String) table.getValueAt(table.getSelectedRow(), 0) + "'";
                     
                     
                     try {
@@ -543,8 +646,8 @@ public class PlanningGUI implements ActionListener{
                         System.out.println("La bd a bien été mise à jour");
                         System.out.println(queryDel);
                         editCard.removeAll();
-                        JPanel volTablePanel = generateVolTable();
-                        editCard.add(volTablePanel);
+                        JPanel competTablePanel = generatePlanningTable();
+                        editCard.add(competTablePanel);
                         editCard.revalidate();
                         editCard.repaint();
                     } catch(SQLException ex) {
