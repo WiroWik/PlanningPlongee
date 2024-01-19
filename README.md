@@ -1,5 +1,7 @@
 # SAE 0.1 Application Java
 
+Perlato Luka & Le Berre Léon
+
 ## Pour se connecter à la base de données
 
 Pour modifier les identifiants de connexion, il suffit de modifier les constantes :
